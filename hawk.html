@@ -1,0 +1,233 @@
+<html>
+<head>
+	<style>
+		.street {
+			fill: none;
+			stroke: #888;
+			stroke-width: 3px;
+		}
+
+		.land {
+			fill: #E8E8E8;
+		}
+
+		.water {
+			fill: #B3DDF2;
+		}
+
+		.grid {
+			stroke: #FFF;
+			stroke-width: 2px;
+			opacity: 0.8;
+		}
+
+	</style>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.19/topojson.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.js" charset="utf-8"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/queue-async/1.0.7/queue.min.js"></script>
+</head>
+<body>
+</body>
+<script>
+	var width = 602,
+		height = 900;
+
+	var projection = d3.geo.mercator()
+		.scale(200000)
+		.center([-77.3, 41.69])
+		.translate([width/2, height/2])
+		.rotate([9.55,-0.9])
+		//.translate([4000,2000])
+
+	var path = d3.geo.path()
+		.projection(projection);
+
+	var svg = d3.select("body").append("svg")
+		.attr("width", width)
+		.attr("height", height);
+
+	svg.append("rect")
+		.attr("width",width)
+		.attr("height",height)
+		.attr("class","water");
+
+	var dataCheck;
+
+	queue()
+		.defer(d3.json, "./illinois.json")
+		.defer(d3.json, "./street-data.json")
+		.await(ready);
+
+	function ready(error, illinois, streetData) {
+		svg.append("path")
+			.datum(illinois)
+			.attr("class","land")
+			.attr("d", path)
+
+		dataCheck = streetData;
+
+		for (var i = 0; i < streetData.streets.length; i++) {
+			streetData.streets[i].feature.geometry.coordinates = switchCoordinates(streetData.streets[i].feature.geometry.coordinates);
+		};
+
+		var grid = svg.append("g")
+			.attr("class", "grid");
+
+		grid.append("path")
+			.attr("d","M0,450 L" + width + ",450")
+			.style("stroke-width","5px")
+
+		grid.append("path")
+			.attr("d","M330,0 L330," + height)
+			.style("stroke-width","5px")
+
+
+		for (var i = 58; i < width; i += 68) {
+			grid.append("path")
+				.attr("d","M" + i + ",0 L" + i + "," + height)
+		};
+
+		for (var i = 42; i < height; i += 68) {
+			grid.append("path")
+				.attr("d","M0," + i + " L" + width + "," + i)
+		};
+
+		setTimeout(function() { drawStreets(["Madison","State"]); }, 0)
+		setTimeout(function() { drawStreets(["Halsted","Ashland","Western","Kedzie"]); }, 1000)
+		setTimeout(function() { drawStreets(); }, 2000)
+
+		function drawStreets(streetList) {
+			var data;
+			if (streetList == undefined) {
+				data = streetData.streets;
+			} else {
+				console.log("streetList: ", streetList)
+				data = streetData.streets.filter(function(d) { return streetList.indexOf(d.name) != -1; })
+			}
+
+			var streets = svg.selectAll(".street").data(data, function(d) { return d.name; });
+
+			streets.enter().append("path")
+				.attr("id", function(d) { return d.name; })
+				.attr("d",function(d) { console.log("d: ", d); return path(d.feature); })
+				.attr("class","street")
+				.style("stroke", function(d) { 
+					if (d.name == "Madison" || d.name == "State") {
+						return "#444";
+					} else {
+						return "#AAA";
+					};
+				})
+				.call(transition)
+
+			function transition(path) {
+				path.transition()
+					.duration(1000)
+					.attrTween("stroke-dasharray", tweenDash)
+					.each("end", function() { console.log("transition finished"); });
+			}
+
+			function tweenDash() {
+				var l = this.getTotalLength(),
+					i = d3.interpolateString("0," + l, l + "," + l);
+
+				return function(t) { return i(t); };
+			}
+
+		}
+
+
+	}	
+
+	// d3.json("./illinois.json", function(err, illinois) {
+	// 	svg.append("path")
+	// 		.datum(illinois)
+	// 		.attr("class","land")
+	// 		.attr("d", path)
+
+	// 	d3.json("./street-data.json", function(err, data) {
+	// 		if (err) {
+	// 			console.log("err: ", err);
+	// 		};
+
+	// 		dataCheck = data;
+	// 		// for (var i = 0; i < data.Halsted.geometry.coordinates.length; i++) {
+	// 		// 	latitude = data.Halsted.geometry.coordinates[i][0];
+	// 		// 	longitude = data.Halsted.geometry.coordinates[i][1];
+
+	// 		// 	data.Halsted.geometry.coordinates[i][0] = longitude;
+	// 		// 	data.Halsted.geometry.coordinates[i][1] = latitude;
+	// 		// };
+
+	// 		for (var i = 0; i < data.streets.length; i++) {
+	// 			data.streets[i].feature.geometry.coordinates = switchCoordinates(data.streets[i].feature.geometry.coordinates);
+	// 		};
+
+	// 		var grid = svg.append("g")
+	// 			.attr("class", "grid");
+
+	// 		grid.append("path")
+	// 			.attr("d","M0,450 L" + width + ",450")
+	// 			.style("stroke-width","5px")
+
+	// 		grid.append("path")
+	// 			.attr("d","M330,0 L330," + height)
+	// 			.style("stroke-width","5px")
+
+
+	// 		for (var i = 58; i < width; i += 68) {
+	// 			grid.append("path")
+	// 				.attr("d","M" + i + ",0 L" + i + "," + height)
+	// 		};
+
+	// 		for (var i = 42; i < height; i += 68) {
+	// 			grid.append("path")
+	// 				.attr("d","M0," + i + " L" + width + "," + i)
+	// 		};
+
+	// 		var streets = svg.selectAll(".street").data(data.streets.filter(function(d) { return ["Halsted", "Ashland","Western","Kedzie"].indexOf(d.name) != -1 }))
+
+	// 		streets.enter().append("path")
+	// 			.attr("id", function(d) { return d.name; })
+	// 			.attr("d",function(d) { console.log("d: ", d); return path(d.feature); })
+	// 			.attr("class","street")
+	// 			.style("stroke", function(d) { 
+	// 				if (d.name == "Madison" || d.name == "State") {
+	// 					return "#888";
+	// 				} else {
+	// 					return "#AAA";
+	// 				};
+	// 			})
+	// 			.call(transition)
+
+	// 		function transition(path) {
+	// 			path.transition()
+	// 				.duration(1000)
+	// 				.attrTween("stroke-dasharray", tweenDash)
+	// 				.each("end", function() { console.log("transition finished"); });
+	// 		}
+
+	// 		function tweenDash() {
+	// 			var l = this.getTotalLength(),
+	// 				i = d3.interpolateString("0," + l, l + "," + l);
+
+	// 			return function(t) { return i(t); };
+	// 		}
+
+
+	// 		console.log("data: ", data);
+	// 	})
+	// });
+
+	var switchCoordinates = function(data) {
+		for (var i = 0; i < data.length; i++) {
+			x0 = data[i][0];
+			x1 = data[i][1];
+			data[i][0] = x1;
+			data[i][1] = x0;
+		};
+
+		return data;
+	}
+
+</script>
