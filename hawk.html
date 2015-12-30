@@ -1,6 +1,17 @@
 <html>
 <head>
 	<style>
+		#map {
+			display: inline-block;
+			top: 10px;
+			left: 10px;
+			z-index: 1;
+			margin-left: 0;
+
+			height: 900px;
+			width: 600px;
+		}
+
 		.street {
 			fill: none;
 			stroke: #888;
@@ -27,6 +38,17 @@
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/queue-async/1.0.7/queue.min.js"></script>
 </head>
 <body>
+	<div id='map'>
+	</div>
+	<div id='sections'>
+		<section class="step">
+		</section>
+		<section class="step">
+		</section>
+		<section>
+		</section>
+	</div>
+
 </body>
 <script>
 	var width = 602,
@@ -42,7 +64,7 @@
 	var path = d3.geo.path()
 		.projection(projection);
 
-	var svg = d3.select("body").append("svg")
+	var svg = d3.select("#map").append("svg")
 		.attr("width", width)
 		.attr("height", height);
 
@@ -55,14 +77,22 @@
 
 	queue()
 		.defer(d3.json, "./illinois.json")
+		.defer(d3.json, "./waterway.topo.json")
 		.defer(d3.json, "./street-data.json")
 		.await(ready);
 
-	function ready(error, illinois, streetData) {
+	function ready(error, illinois, water, streetData) {
 		svg.append("path")
 			.datum(illinois)
 			.attr("class","land")
 			.attr("d", path)
+
+		console.log("water.ob: ", water)
+
+		svg.append("path")
+			.datum(topojson.feature(water, water.objects.waterway))
+			.attr("class", "water")
+			.attr("d", path);
 
 		dataCheck = streetData;
 
@@ -94,7 +124,8 @@
 
 		setTimeout(function() { drawStreets(["Madison","State"]); }, 0)
 		setTimeout(function() { drawStreets(["Halsted","Ashland","Western","Kedzie"]); }, 1000)
-		setTimeout(function() { drawStreets(); }, 2000)
+		setTimeout(function() { drawStreets(["Chicago","North", "Fullerton","Belmont","Irving Park","Lawrence","Roosevelt","Cermak","35th","47th","55th/Garfield"]); }, 2000)
+		setTimeout(function() { drawStreets(["Cottage Grove","Lake Shore Drive"]); }, 3000)
 
 		function drawStreets(streetList) {
 			var data;
@@ -107,18 +138,40 @@
 
 			var streets = svg.selectAll(".street").data(data, function(d) { return d.name; });
 
-			streets.enter().append("path")
-				.attr("id", function(d) { return d.name; })
-				.attr("d",function(d) { console.log("d: ", d); return path(d.feature); })
-				.attr("class","street")
-				.style("stroke", function(d) { 
-					if (d.name == "Madison" || d.name == "State") {
-						return "#444";
+			var street = streets.enter().append("g")
+
+			street.append("path")
+					.attr("id", function(d) { return d.name; })
+					.attr("d",function(d) { console.log("d: ", d); return path(d.feature); })
+					.attr("class","street")
+					.style("stroke", function(d) { 
+						if (d.name == "Madison" || d.name == "State") {
+							return "#444";
+						} else {
+							return "#AAA";
+						};
+					})
+					.call(transition)
+
+			street.append("path")
+				.attr("id",function(d) { return d.name + "-textpath";})
+				.attr("d", function(d) { return getTextPath(d); })
+				.attr("transform", function(d) {
+					if (d.name == "Lake Shore Drive") {
+						return "translate(5,0)";
 					} else {
-						return "#AAA";
-					};
+						return "translate(0,0)";
+					}
 				})
-				.call(transition)
+				.style("fill","none")
+			
+			street.append("text")
+				.attr("font-family","Verdana")
+				.attr("font-size","9")
+				.append("textPath")
+					.attr("xlink:href",function(d) { return "#" + d.name + "-textpath"; })
+					.attr("startOffset", "50%")
+					.text(function(d) { return d.name; })
 
 			function transition(path) {
 				path.transition()
@@ -132,6 +185,68 @@
 					i = d3.interpolateString("0," + l, l + "," + l);
 
 				return function(t) { return i(t); };
+			}
+
+			function getTextPath(d) {
+				switch(d.name) {
+					case "Madison":
+						return "M-55,442 L180,442";
+						break;
+					case "Chicago":
+						return "M-55,374 L180,374";
+						break;
+					case "North":
+						return "M-55,306 L180,306";
+						break;
+					case "Fullerton":
+						return "M-55,238 L180,238";
+						break;
+					case "Belmont":
+						return "M-55,170 L180,170";
+						break;
+					case "Irving Park":
+						return "M-55,102 L180,102";
+						break;
+					case "Lawrence":
+						return "M-55,34 L180,34"
+						break;
+					case "Roosevelt":
+						return "M-55,510 L180,510";
+						break;
+					case "Cermak":
+						return "M-55,578 L180,578";
+						break;
+					case "35th":
+						return "M13,680 L248,680";
+						break;
+					case "47th":
+						return "M-55,782 L180,782";
+						break;
+					case "55th/Garfield":
+						return "M-55,850 L180,850";
+						break;
+					case "State":
+						return "M317,355 L317,555";
+					case "Halsted":
+						return "M249,355 L249,555";
+						break;
+					case "Ashland":
+						return "M181,355 L181,555";
+						break;
+					case "Western":
+						return "M113,355 L113,555";
+						break;
+					case "Kedzie":
+						return "M45,355 L45,555";
+						break;
+					case "Lake Shore Drive":
+						console.log("lake shore drive d: ", d);
+						return path(d.feature);
+						break;
+					default:
+						return "M-1000,-1000, L-900,-1000";
+						break;
+				}
 			}
 
 		}
